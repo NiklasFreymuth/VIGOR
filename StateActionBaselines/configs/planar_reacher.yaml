@@ -1,0 +1,86 @@
+name: "SLURM"   # MUST BE "SLURM"
+
+# Required
+
+partition: "single"
+job-name: "baselines"    # this will be the experiment name in slurm
+
+num_parallel_jobs: 99
+ntasks: 1
+cpus-per-task: 32
+time: 2800  # in minutes
+mem: 40000
+
+sbatch_args: # Dictionary of SBATCH keywords and arguments
+  distribution: cyclic  # To have repetitions of the same exp be distributed to different nodes
+
+slurm_log: "./experiments/slurmlog" # optional. dir in which slurm output and error logs will be saved.
+---
+name: "DEFAULT"   # MUST BE DEFAULT
+path: "./experiments/clusterwork/"   # location to save results in
+
+repetitions: 1
+reps_per_job: 1 # number of repetitions in each job. useful for paralellization. defaults to 1.
+reps_in_parallel: 1 # number of repetitions in each job that are executed in parallel. defaults to 1.
+params:
+  identifier: planar_reacher
+  modality: geometric  # should not matter, as we directly learn on ProMP parameters
+
+  verbose: False
+
+  observation_type: reward_like
+  task: planar_reacher
+
+  rollouts_per_context: 5
+  num_train_contexts: 6
+  num_framestacks: 1
+
+  # algorithm specific parameters
+  algorithm:  bc  # bc or mbc
+  bc:
+    num_layers: 2
+    neurons_per_layer: 64
+    learning_rate: 3.0e-4
+    batch_size: 128
+    ent_weight: 1.0e-3
+    l2_weight: 0.0
+    n_epochs: 3000
+
+  mbc:
+    num_layers: 2
+    neurons_per_layer: 64
+    learning_rate: 3.0e-4
+    batch_size: 64
+    ent_weight: 1.0e-3
+    l2_weight: 0.0
+    n_epochs: 3000
+    num_components: 5
+    entropy_approximation_mode: independent_gaussian
+    train_categorical_weights: True
+
+
+  # discriminator parameters and network architecture
+  gail:
+    total_timesteps: 1000000
+    neurons_per_layer: 32
+    learning_algorithm: ppo
+    demo_batch_size: 128
+    num_layers:  2
+    # learner/generator network architecture
+    learner:
+      neurons_per_layer: 32
+      num_layers: 2
+      share_network: 0
+      n_steps: 2048
+      batch_size: 128
+
+  include_timestep: True
+---
+name: planar_reacher_baselines
+params:
+  identifier: planar_reacher_baselines
+
+list:
+  algorithm: [bc, mbc, gail]
+  num_framestacks: [1, 5 , 5]
+  include_target_encoding: [0, 0, 1]

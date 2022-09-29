@@ -1,0 +1,81 @@
+# 60 exps
+
+name: "SLURM"   # MUST BE "SLURM"
+
+# Required
+
+partition: "single"
+job-name: "panda_bct"    # this will be the experiment name in slurm
+
+num_parallel_jobs: 99
+ntasks: 1
+cpus-per-task: 32
+time: 2800  # in minutes
+mem: 40000
+
+sbatch_args: # Dictionary of SBATCH keywords and arguments
+  distribution: cyclic  # To have repetitions of the same exp be distributed to different nodes
+
+
+slurm_log: "./experiments/slurmlog" # optional. dir in which slurm output and error logs will be saved.
+---
+name: "DEFAULT"   # MUST BE DEFAULT
+path: "./experiments/clusterwork/"   # location to save results in
+
+repetitions: 1
+reps_per_job: 1
+reps_in_parallel: 1
+params:
+  identifier: panda_reacher_bct
+  modality: geometric  # should not matter, as we directly learn on ProMP parameters
+  verbose: False
+
+  meta_task:
+    num_train_contexts: 6
+    num_test_contexts:  6
+    num_validation_contexts: 0
+    shuffle_demonstrations: True
+    num_evaluation_samples: 100
+    sample_size: 5
+    return_expert_promp_weights: True
+
+  task:
+    data_source: promp_fits
+    task: panda_reacher
+
+  # algorithm specific parameters
+  algorithm:  bc  # bc or mbc
+  num_layers: 3
+  neurons_per_layer: 128
+  learning_rate: 3.0e-4
+  batch_size: 4
+  ent_weight: 1.0e-3
+  l2_weight: 0.0
+  n_epochs: 30000
+
+  # only needed for mbc
+  train_categorical_weights: None
+  num_components: 5
+  entropy_approximation_mode: independent_gaussian
+
+
+---
+name: panda_reacher_bct
+
+params:
+  num_layers: 4
+  neurons_per_layer: 64
+  batch_size: 4
+
+---
+name: panda_reacher_mbct
+
+params:
+  algorithm:  mbc  # bc or mbc
+  num_layers: 3
+  neurons_per_layer: 64
+  batch_size: 4
+  # only needed for mbc
+  train_categorical_weights: False
+  num_components: 5
+  entropy_approximation_mode: independent_gaussian

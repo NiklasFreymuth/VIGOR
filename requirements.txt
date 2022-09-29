@@ -1,0 +1,51 @@
+# hyperparameter and performance tracking
+wandb==0.12.9
+resource==0.2.1
+
+# run dispatching and recording
+cw2
+
+# deterministic and regular proMPs
+git+https://github.com/ALRhub/mp_lib
+
+# time series
+pyglet==1.5.0
+
+# added because the install fails otherwise
+pyqt5==5.12.0
+pyqtwebengine==5.12.0
+
+# torch
+torch==1.10.1
+tensorboard==2.2.1
+
+# recording/tracking
+PyPDF2==1.26.0  # merged visualizations
+tqdm==4.47.0  # nice progress bars
+
+# visualizations
+matplotlib==3.5.1
+
+## videos
+pymupdf==1.18.14
+opencv-python==4.5.2.54
+
+# scientific computing and optimization
+opt-einsum==3.1.0
+numpy==1.22.1
+scipy==1.7.3
+sklearn==0.0
+nlopt==2.7.0
+pandas==1.4.2
+numba==0.53.1
+
+# Baselines
+gym==0.19.0
+joblib==1.1.0
+PyYAML==6.0
+# stable_baselines3==1.4.0
+plotly==5.5.0
+
+# manually install afterwards:
+# git+https://github.com/HumanCompatibleAI/imitation.git  # 0.2.0?
+# pin==2.6.4  # Forward Kinematics needs to be installed via conda on windows

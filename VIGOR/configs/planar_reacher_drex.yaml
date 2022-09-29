@@ -1,0 +1,128 @@
+name: "SLURM"   # MUST BE "SLURM"
+
+# Required
+partition: "single"
+job-name: "planar_DREX"    # this will be the experiment name in slurm
+
+num_parallel_jobs: 99
+ntasks: 1
+cpus-per-task: 32
+time: 2800  # in minutes
+mem: 25000
+
+sbatch_args: # Dictionary of SBATCH keywords and arguments
+  distribution: cyclic  # To have repetitions of the same exp be distributed to different nodes
+
+slurm_log: "./experiments/slurmlog" # optional. dir in which slurm output and error logs will be saved.
+---
+name: "DEFAULT"   # MUST BE DEFAULT
+import_path: "default.yaml"
+
+repetitions: 1
+reps_per_job: 1
+reps_in_parallel: 1
+params:
+  algorithm: DRex
+  steps_per_iteration: 10
+
+  iterations: 31
+
+  recording:
+    make_videos: False
+    draw_expensive_plots: True
+    wandb_logging: default
+    checkpoint_save_frequency: 1
+    pseudo_contextual:
+      record_train_policies: False
+      record_validation_policies: False
+      record_test_policies: True
+      record_drex_train_policies: True
+      plotted_train_contexts: 0
+      plotted_validation_contexts: 0
+      plotted_test_contexts: 6
+      plotted_drex_train_contexts: 6
+
+  meta_task:
+    seed: default
+    pytorch_seed: paired
+    shuffle_demonstrations: True
+    num_train_contexts: 6
+    num_validation_contexts: 0
+    num_test_contexts: 6
+    num_evaluation_samples: 100
+    sample_size: 5
+
+  network:
+    regularization: # regularization in the form of batch_norm and dropout help
+      dropout: 0.2
+      l2_norm: 0
+      activation_function: leakyrelu
+      spectral_norm: False
+      batch_norm: True
+    time_series:
+      architecture: 1d_cnn
+      1d_cnn:
+        kernel_size: 5
+        num_layers: 4
+        num_channels: 64
+        padding: zero
+        stepwise_aggregation_method: sum
+      stepwise_loss: False
+
+    learning_rate: 3.0e-5
+    epochs: 1000
+    batch_size: 128
+    validation_split: 0.1
+    verbose: 0
+    early_stopping:
+      patience: 50
+      restore_best: true
+  vigor:
+    reward_alpha: 1000
+    reward:
+      sample_variance_multiplier: 1
+      regression_loss_function: "drex"  # either "mse" for a regular regression, or "drex" for a comparison-based loss
+      regression_network:
+        is_regression_network: True
+      num_regression_samples: 8192
+      num_regression_networks: 5
+      target_normalization: "normal"
+      sample_normalization: false
+      network_aggregation_method: "mean"
+
+      drex:
+        em_gmm:
+          num_fit_components: 1
+          num_source_samples: 5
+        maximum_variance_multiplier: 10
+        num_variance_levels: 5
+        use_em_gmm: True
+
+  policy:
+    component_time_to_live: 5000
+    num_components: 5
+    weight_update_type: null
+    kl_bound: 0.2
+    samples_per_component: 512
+
+  task:
+    data_source: promp_fits
+    task: planar_reacher
+  modality: geometric
+
+---
+name: planar_reacher_drex
+
+params:
+  vigor:
+    reward_alpha: 100
+    reward:
+      sample_variance_multiplier: 0.3
+      drex:
+        maximum_variance_multiplier: 5
+        em_gmm:
+          num_fit_components: 3
+  network:
+    time_series:
+      1d_cnn:
+        num_layers: 2

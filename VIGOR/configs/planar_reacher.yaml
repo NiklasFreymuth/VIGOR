@@ -1,0 +1,117 @@
+name: "SLURM"   # MUST BE "SLURM"
+
+# Required
+partition: "single"
+job-name: "planar_VIGOR"    # this will be the experiments name in slurm
+
+# Required - Cluster Specific
+num_parallel_jobs: 99
+ntasks: 1
+cpus-per-task: 16
+mem-per-cpu: 8000
+time: 1800  # in minutes
+mem: 25000
+
+sbatch_args: # Dictionary of SBATCH keywords and arguments
+  distribution: cyclic  # To have repetitions of the same exp be distributed to different nodes
+
+slurm_log: "./experiments/slurmlog" # optional. dir in which slurm output and error logs will be saved.
+---
+name: "DEFAULT"   # MUST BE DEFAULT
+import_path: "default.yaml"
+
+repetitions: 1
+reps_per_job: 1 # number of repetitions in each job. useful for paralellization. defaults to 1.
+reps_in_parallel: 1 # number of repetitions in each job that are executed in parallel. defaults to 1.
+params:
+
+  algorithm: VIGOR
+  iterations: 31
+  steps_per_iteration: 10
+  recording:
+    make_videos: False
+    draw_expensive_plots: True
+    wandb_logging: default
+    checkpoint_save_frequency: 1
+    pseudo_contextual:
+      record_train_policies: True
+      record_validation_policies: True
+      record_test_policies: False
+      plotted_train_contexts: 6
+      plotted_validation_contexts: 6
+      plotted_test_contexts: 0
+
+  policy:
+    component_time_to_live: 5000
+    num_components: 5
+    weight_update_type: null
+    kl_bound: 0.2
+    samples_per_component: 512
+
+  network:
+    num_dres: 5
+    dre_aggregation: "mean"
+    uniform_policy_dre_samples: True
+    batch_size: 64
+    validation_split: 0.1
+    verbose: 0
+    early_stopping:
+      patience: 10
+      restore_best: true
+      warmup: 10
+    epochs: 50
+    feedforward:
+      max_neurons_per_layer: "tied"
+
+    learning_rate: 3.0e-4
+
+    regularization:
+      batch_norm: false
+      dropout: 0.2
+      l2_norm: 0
+      spectral_norm: false
+      activation_function: leakyrelu
+    time_series:
+      architecture: 1d_cnn
+      1d_cnn:
+        kernel_size: 5
+        num_layers: 2
+        num_channels: 32
+        padding: zero
+        stepwise_aggregation_method: sum
+
+      stepwise_loss: True
+
+  meta_task:
+    sample_size: 5
+    num_test_contexts: 0
+    seed: default
+    pytorch_seed: paired
+    shuffle_demonstrations: True
+    num_evaluation_samples: 100
+    num_train_contexts: 6
+    num_validation_contexts: 6
+
+  task:
+    data_source: promp_fits
+    task: planar_reacher
+
+  modality: geometric
+
+---
+name: planar_reacher_vigor
+params:
+  algorithm: VIGOR
+
+  iterations: 301
+  steps_per_iteration: 1
+  recording:
+    checkpoint_save_frequency: 1
+  network:
+    time_series:
+      1d_cnn:
+        kernel_size: 5
+        num_layers: 2
+        num_channels: 32
+      stepwise_loss: True
+

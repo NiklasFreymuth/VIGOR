@@ -1,0 +1,210 @@
+---
+# DEFAULT parameters (Optional)
+name: "DEFAULT"   # MUST BE DEFAULT
+
+# Implementation default parameters
+path: "./experiments/clusterwork/"   # location to save results in
+repetitions: 1   # number of times one set of parameters is run
+
+reps_per_job: 1 # number of repetitions in each job. useful for paralellization. defaults to 1.
+reps_in_parallel: 1 # number of repetitions in each job that are executed in parallel. defaults to 1.
+
+
+params:
+  # all parameters used for VIRL. Each scalar parameter can be either given directly or as its own logarithm. The
+  # latter is done by adding a "log_" prefix to it. "log_" parameters have priority over their normal counterparts
+  algorithm: VIRL  # VIPS, EIM or VIRL
+  iterations: 100  # how many outer iterations to run the algorithm for
+  steps_per_iteration: 1  # perform n steps of the algorithm before recording a single step. Used to speed up things
+  # as the recording takes some time, as well as to reduce the memory footprint for multiple experiments
+
+  recording: # subdict for recording the results of the algorithm
+    make_videos: True
+    draw_expensive_plots: False  # whether or not to draw "expensive" plots, i.e., plots that can take up several MB of
+      # space per run
+    wandb_logging: default  # whether to track this experiment using wandb.ai (weights and biases) or not
+    # true to always track, false to never track, "default" to track precisely on unix systems
+    wandb_entity: null
+    checkpoint_save_frequency: 10  # how often to checkpoint the models (the GMM and potentially reward parameters)
+    pseudo_contextual: # only considered for the pseudo-contextual tasks
+      plotted_train_contexts: 6  # number of train contexts to plot visualizations for
+      plotted_validation_contexts: 6  # number of validation contexts to plot visualizations for
+      plotted_test_contexts: 3  # number of test contexts to plot visualizations for
+      plotted_drex_train_contexts: 3
+      record_train_policies: True   # whether to record train policies or not
+      record_validation_policies: True   # whether to record validation policies or not
+      record_test_policies: True  # whether to also record test policies or not
+      record_drex_train_policies: True
+
+  policy:
+    component_addition_frequency: 5
+    component_time_to_live: 100
+    component_weight_threshold: 0.01 # weight to initialize new components at and "cutoff"
+    #  weight to delete bad components based on
+    num_components: 10
+    kl_bound: 0.05 # maximum kl between old and new distributions both for individual components and component weights
+    # only relevant for the weight update for "vanilla" weight update type
+    samples_per_component: 512
+    weight_update_type: vanilla  # Algorithm/Heuristic used to update the weight of the gmm policy. May be
+    # null/None for disabled weight updates
+    # "closed_form" for a closed form/softmax weight update
+    # "vanilla" for the weight update via REPS as described in the EIM/VIPS paper
+    # "separate" to keep an unweighted policy and do a closed form/softmax update for a separate copy of the policy
+
+  network:
+    num_dres: 1  # number of density ratio estimators
+    dre_aggregation: "mean"  # either "min", "max", "mean" or "median"
+    use_gpu: False
+    epochs: 50
+    learning_rate: 3.0e-4
+    batch_size: 512
+    validation_split: 0.1
+    verbose: 0
+    uniform_policy_dre_samples: True  # How to draw the DRE samples from the policy GMM for EIM and VIGOR
+    # False draws the samples directly from the GMM, whereas True creates a new GMM with uniform weights to draw from
+    early_stopping:
+      patience: 0 # either an integer or "iteration". If iteration, will have a patience of 1
+      # for the first outer iteration, a patience of 2 for the second and so on. Can be set to 0 or false for
+      # no early stopping
+      warmup: 10  # train for n epochs before starting early stopping
+      restore_best: True  # whether to restore the best parameters. Requires saving intermediate models every epoch
+    feedforward: # builds a standard fully connected network using 3 parameters. Note that if num_layers=0, the other
+      # two parameters do not matter, and instead a linear model (plus a bias) is returned.
+      max_neurons_per_layer: 32  # either an integer or "tied" to have this have however many neurons the "main" layer
+      # of the architecture has. "tied" currently works for lstm-based architectures
+      num_layers: 2
+      network_shape: "="  # Eligible shapes are 'block' ("="), 'contracting' (">"), 'expanding' ("<"),
+      #  'hourglass' ("><"), 'rhombus' ("<>")
+
+    regularization: # shared regularization subconfig for the whole network
+      l2_norm: 1.0e-7  # l2 regularization to use for the whole training
+      dropout: 0.2  # 1d dropout for feedforward, 2d dropout for encoder. Shared between all parts of the network
+      spectral_norm: True  # whether to add spectral normalization r not
+      batch_norm: True  # whether to use batch_norm between layers or not. "ghost" for ghost batch normalization
+      layer_norm: False  # whether to use layer normalization or not. Only applied if batch_norm = False
+      activation_function: leakyrelu  # what activation function to use. Currently supports 'leakyrelu' and 'swish'
+    time_series: # time_series tasks deal with sequences of observations, possibly requiring different treatment
+      architecture: shared_mlp  # either "shared_mlp" for a multi-layer perceptron acting on each step,
+      #  "hollistic mlp" for one big MLP acting on all steps, or individual MLPs per ste, or
+      #  "lstm" for a recurrent model. Each of these has a subconfig to specify more details.
+
+      1d_cnn:
+        timestamp_encoding: normalized
+        # either "normalized" for a single additional feature that takes a timestamp between 0 and 1, or
+        # "one_hot" for a one-hot encoding, resulting in one feature per step that is 1 precisely for this step.
+        num_layers: 2  # number of convolutional_layers to use in front of the main network
+        kernel_size: 5  # >=1. The total size of the convolutional layer.
+        # A size of 3 means 3 neighbors (including the element itself) on each side, i.e., 5 elements in total
+        num_channels: 16  # number of channels in each convolutional layer. Corresponds to the number of neurons in
+        # a regular MLP for each timestep.
+        padding: zero  # whether to (zero-)pad the sequence such that the activation of the next layer has the same
+        # amount of steps as the current one, i.e., whether to preserve timesteps or slowly merge them
+        stepwise_aggregation_method: "mean"  # either "mean" or "sum". How to aggregate over the final timesteps.
+
+      hollistic_mlp:  # MLP networks that act on the flattened time-series data. Shares the "feedforward" config for network
+        # specification.
+        variant: "stepwise" # either "full" to use all timestamps as one big input vector, or
+            # "stepwise" to separate the input into individual steps, where each step gets its own MLP.
+        use_external_bias: False  # whether to use a bias for the final layer of each step, or just for the aggregated value
+        stepwise_aggregation_method: "mean"  # either "mean" or "sum".
+        #  Aggregation of the individual steps for the stepwise model
+      shared_mlp:
+        include_next_step: False  # Whether to include the next step of the sequence as features or not
+        timestamp_encoding: normalized
+        # either "normalized" for a single additional feature that takes a timestamp between 0 and 1, or
+        # "one_hot" for a one-hot encoding, resulting in one feature per step that is 1 precisely for this step.
+      lstm: # configuration of the LSTM cell
+        timestamps: False  # whether to explicitly add (normalized) timestamps for each initial feature step or not.
+        # May be either False for no timestamps, "encoder" for timestamps for the encoder, "lstm" for timestamps as an
+        # additional input to each lstm step, or "both" for timestamps for both the lstm and the encoder.
+        aggregate_timesteps: True  # whether to aggretate over all hidden steps (True) or only use the last one (False)
+        hidden_dim: 16  # size of the LSTM cell, i.e., dimensionality if the hidden state, the gates etc.
+        num_layers: 1  # number of stacked lstm layers. If >1, dropout will be applied between all layers
+        is_bidirectional: False  # whether to use a bilstm (True) or a "simple" forward one (False)
+        use_encoder: True  # whether to use an encoder of the data before it is fed into the lstm or not
+        encoder: # timestep-wise encoder for the initial data to give richer representations to the lstm
+          max_neurons_per_layer: 32
+          num_layers: 2
+          network_shape: "="
+      stepwise_loss: False  # whether to apply the "main" training loss in a stepwise fashion or not
+
+  modality: null   # modality of the expert observations. Currently uses
+    # "geometric" for the geometric behavioral descriptors
+
+  vigor:
+    reward_alpha: 1  # constant multiplier of the reward part of the VIPS objective of the test policies
+    n_update_jobs: 1  # maximum parallel number of jobs to start for train/validation/test context updates
+    reward: # subconfig for Regression EIM
+      drex:  # drex ranks samples by the variance of the producing policies, so we need different policy variances
+        maximum_variance_multiplier: 1  # >=1. draw samples from policies with variance [1, max. multiplier]
+        num_variance_levels: 1  # draw num_variance_levels linearly spaced samples
+        use_em_gmm: False  # whether to use the expectation maximization GMMs (True, fit on VIPS samples) or not
+        em_gmm:
+          fit_name: null  # name of the em_gmm that was fit, e.g., promp_1_10
+          num_source_samples: 10 # number of samples used for the em_gmm fit
+          num_fit_components: 2 # if use_em_gmm is true, determines the number of components used by the GMM
+      regression_network: # extra network for the regressed reward of VIGOR. This network overwrites identical entries
+        # of the "default" network defined above. The idea is that the regressed reward can thus use a network of
+        # higher capacity than that of the individual DREs. Having the DRE network as the "base" allows for easier
+        # parameterization overall, since only the values that are to be changed need to be specified
+        is_regression_network: True
+        # e.g.,
+        # feedforward:
+        #   max_neurons_per_layer: 128
+        #   num_layers: 3
+        #   network_shape: "rhombus"
+      reset_test_policies: true  # whether or not to start with a fresh test policy every time
+      reset_regression_networks: true # whether to reset the regression networks before every regression
+      test_policies_heuristics: false  # whether to use component addition/deletion heuristics for the test policies
+      # doing so may speed up convergence, but can also lead to problems because the new additions do not obey the
+      # trust regions and can thus more easily land on a diverging cone
+      sample_variance_multiplier: 1  # since we draw samples from the training policies, we may lack sufficient
+      # sample diversity for the regressor. If > 1, this multiplies the covariance of each policy by a constant
+      # before drawing samples to artificially increase diversity
+
+      sampling_policy_mixture_rate: equal  # how to weight the train policies over different iterations. A value (0,1]
+      # means that every new list of train_policies added to the regression class gets an initial weight of this value
+      # in the sampling GMMs. "equal" means that policies from all iterations are kept with an equal weight. A value of
+      # 1 means that only the latest set of policies is used for sampling
+      fresh_policy_sample_rate: 1  # in [0,1]. The amount of samples to be drawn from the current policy
+      # (+sample_variance_multiplier), regardless of the policy_mixture_rate
+
+      num_regression_networks: 3  # how many regression networks to use. If its an int, it uses this many
+      # networks. Each network is trained on the same data.
+      num_regression_samples: 2048  # number of samples for the regression.
+      target_normalization: "normal" # whether to normalize the targets for the regression
+      # (i.e., the evaluation of log density+dre)or not. Can be
+      # false for no normalization,
+      # "zero_mean" to shift the target mean to 0,
+      # "normal" to shift *all* targets to a joint Gaussian N(0,I), or
+      # "policy_wise" to independently normalize all targets into a gaussian N(0,I) each.
+      sample_normalization: false  # whether to normalize the samples for the regression
+      # (i.e., the features of the policy samples) or not.
+      # Can be false for no normalization and "normal" to shift to a Gaussian N(0,I)
+      network_aggregation_method: "mean"  # must be some aggregator. Can currently either be "min", "max" or "mean"
+      regression_loss_function: "mse"  # either "mse" for a regular regression, or "drex" for a comparison-based loss
+
+  meta_task:
+    shuffle_demonstrations: False  # whether to shuffle demonstrations/samples or not
+    num_evaluation_samples: 100
+    sample_size: 1  # number of samples to run the experiment with. Test and validation splits included
+    seed: default  # either an integer or "default". If default, the seed will equal the current repetition
+    pytorch_seed: paired  # either an integer, "default" or "paired".
+    # If default, the seed will equal the current repetition. If "paired", it will equal the given "main" seed
+    num_train_contexts: 6  # number of training contexts to learn in the pseudo-contextual setting
+    num_validation_contexts: 0  # number of validation contexts to learn in the pseudo-contextual setting
+    num_test_contexts: 3  # number of test contexts to infer on in the pseudo-contextual setting
+    validation_context_ids: null  # if null, the last num_test_contexts will be chosen.
+    # Must otherwise be a list of length num_validation_contexts. Will only be used if shuffle_demonstrations=False
+    test_context_ids: null  # if null, the last num_test_contexts will be chosen.
+    # Must otherwise be a list of length num_test_contexts. Will only be used if shuffle_demonstrations=False
+
+  task:
+    task: "planar_robot"
+    data_source: "v1"
+
+# either ablation:, grid: or list: and then whatever is to be parsed into params
+# example:
+# grid:
+#   meta_task:
+#     sample_size: [50, 100, 200, 500, 1000]
