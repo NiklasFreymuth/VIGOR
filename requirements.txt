@@ -3,7 +3,7 @@ wandb==0.12.9
 resource==0.2.1
 
 # run dispatching and recording
-cw2
+cw2==1.2.4.1
 
 # deterministic and regular proMPs
 git+https://github.com/ALRhub/mp_lib
